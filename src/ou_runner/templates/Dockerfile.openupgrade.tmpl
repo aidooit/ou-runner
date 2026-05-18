@@ -1,0 +1,12 @@
+FROM {{BASE_IMAGE}}
+
+USER root
+
+# Install git and openupgradelib
+RUN apt-get update && \
+    apt-get install -y git && \
+    pip3 install --no-cache-dir {{BREAK_SYS_PACKAGES}}git+https://github.com/OCA/openupgradelib.git@master git+https://github.com/odoo/upgrade-util@master#egg=odoo_upgrade && \
+{{EXTRA_PIP_LINE}}    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+USER odoo

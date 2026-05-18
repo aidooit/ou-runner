@@ -1,0 +1,24 @@
+  openupgrade{{MAJOR}}:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile.openupgrade{{MAJOR}}
+    container_name: openupgrade{{MAJOR}}
+    depends_on:
+      - postgres
+    ports:
+      - "80{{MAJOR}}:8069"
+    volumes:
+      - ./openupgrade_{{MAJOR}}:/mnt/openupgrade:ro
+      - ./addons/custom_addons_{{MAJOR}}:/mnt/custom_addons:ro
+      - odoo{{MAJOR}}_data:/var/lib/odoo
+    environment:
+      - HOST=postgres
+      - USER=odoo
+      - PASSWORD=odoo
+      - OPENUPGRADE_TARGET_VERSION={{MAJOR}}.0
+    command: ["--addons-path=/mnt/openupgrade,/mnt/custom_addons,/usr/lib/python3/dist-packages/odoo/addons", "--db_host=postgres", "--db_user=odoo", "--db_password=odoo", "--without-demo=all", "--max-cron-threads=0"]
+    networks:
+      - odoo_network
+    profiles:
+      - upgrade{{MAJOR}}

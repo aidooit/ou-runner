@@ -1,0 +1,58 @@
+[project]
+name = "ou-runner"
+version = "0.1.0"
+description = "A Typer CLI that walks Odoo databases through OpenUpgrade version chains in Docker."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Reinaldo J. Menendez", email = "30733733+rejamen@users.noreply.github.com" }]
+keywords = ["odoo", "openupgrade", "migration", "docker", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Database",
+    "Topic :: Software Development :: Build Tools",
+]
+dependencies = [
+    "typer>=0.20.0",
+    "rich>=14.0.0",
+]
+
+[project.scripts]
+ou-runner = "ou_runner.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/aidooit/ou-runner"
+Issues = "https://github.com/aidooit/ou-runner/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ou_runner"]
+
+# .gitignore excludes Dockerfile.openupgrade* (runtime artifacts users
+# generate in their workdir), which would also drop the *template* of
+# the same name from the wheel. Force it back in.
+[tool.hatch.build.targets.wheel.force-include]
+"src/ou_runner/templates/Dockerfile.openupgrade.tmpl" = "ou_runner/templates/Dockerfile.openupgrade.tmpl"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/ou_runner",
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+]
+
+[tool.hatch.build.targets.sdist.force-include]
+"src/ou_runner/templates/Dockerfile.openupgrade.tmpl" = "src/ou_runner/templates/Dockerfile.openupgrade.tmpl"

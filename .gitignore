@@ -1,0 +1,25 @@
+# Python / build
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.venv-*/
+.eggs/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# ou-runner runtime artifacts — only present when running locally for dev
+openupgrade_*/
+Dockerfile.openupgrade*
+docker-compose.yml
+dumps/
+backups/
+logs/
+addons/
+config/odoo.conf
+migration_times.json

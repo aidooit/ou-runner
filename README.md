@@ -1,34 +1,87 @@
-# ou-runner
+# 🚀 ou-runner
 
-A Typer + Rich CLI that walks an Odoo database through OpenUpgrade major
-versions (14 → 19) one hop at a time, using Docker to host the
-PostgreSQL instance and each OpenUpgrade container.
+> **One command. Many Odoo majors. Zero hand-holding.**
 
-`ou-runner` is a thin orchestrator: it clones the [OCA/OpenUpgrade][openupgrade]
-branches you need, generates per-version Dockerfiles and a
-`docker-compose.yml` to host them, and drives `pg_dump` / `pg_restore` /
-`odoo -u all --stop-after-init` for you so each upgrade hop is a single
-command. Everything lives in the directory you run it from — no global
-state, nothing in your home folder.
+If you've ever used [OCA/OpenUpgrade][openupgrade] in a Dockerized
+setup, you already know the drill: switching branches for every
+target major, rebuilding per-version images, hand-rolling `pg_dump`
+and `pg_restore` between hops, and keeping a side note of how long
+each one took.
+
+`ou-runner` takes that loop off your hands. It walks an Odoo database
+from Odoo version **X → Z** one hop at a time, in Docker, with every dump named,
+every hop timed, and every artifact in the folder you ran it from.
 
 > **Disclaimer.** Not affiliated with Odoo S.A. or the OCA OpenUpgrade
 > project. `ou-runner` wraps [OCA/OpenUpgrade][openupgrade] for
 > convenience; the migration scripts themselves belong to OCA.
 
+
+> **Scope.** `ou-runner` was built and tested against an Odoo 14 → 19
+> migration. Earlier majors (≤13) are out of scope — they may work,
+> but nothing about the version table, Dockerfile rendering, or
+> upgrade-path wiring has been exercised against them.
+
 [openupgrade]: https://github.com/OCA/OpenUpgrade
+
+---
+
+## ✨ Features
+
+- 🐳 **Docker-managed Odoo 14 → 19** — one compose file, one network, six profiles
+- 🔄 **Auto-clones OpenUpgrade branches** — no manual `git checkout`
+- 💾 **Automated pg_dump between hops** — each hop's output is the next hop's input
+- ⏱️ **Built-in migration timing** — `migration_times.json` records every run
+- 🍺 **`--hold-my-drink`** — chain every hop from your starting version to the target
+- 🧹 **`clean` sweeps everything** — no global state, nothing in your home folder
+
+---
+
+## Without vs. with ou-runner
+
+```mermaid
+flowchart LR
+  subgraph WITHOUT["😩 Without ou-runner"]
+    direction TB
+    W1[Clone OpenUpgrade 15] --> W2[Write Dockerfile 15]
+    W2 --> W3[docker run postgres + odoo 15]
+    W3 --> W4[pg_restore v14 dump]
+    W4 --> W5[odoo -u all --stop-after-init]
+    W5 --> W6[pg_dump v15]
+    W6 --> W7[Repeat for 16, 17, 18, 19...]
+    W7 --> W8[Track times in a spreadsheet]
+  end
+
+  subgraph WITH["🚀 With ou-runner"]
+    direction TB
+    R1[ou-runner setup --from 14 --to 19]
+    R1 --> R2[ou-runner run --from 14 --to 19 --hold-my-drink]
+    R2 --> R3[ou-runner status]
+  end
+```
 
 ---
 
 ## Install
 
-```bash
-pip install ou-runner
-```
-
-Or, with [uv](https://docs.astral.sh/uv/):
+With [uv](https://docs.astral.sh/uv/) (recommended):
 
 ```bash
 uv tool install ou-runner
+```
+
+Or run it on-demand without installing — `uvx` spins up an ephemeral
+environment, runs the command, and gets out of the way:
+
+```bash
+uvx ou-runner --help
+uvx ou-runner setup --from 14 --to 19
+```
+
+Or with pip:
+
+```bash
+pip install ou-runner
 ```
 
 ---
@@ -40,7 +93,7 @@ uv tool install ou-runner
   fast.
 - **A PostgreSQL custom-format dump** of the Odoo 14 database you want to
   migrate (not a plain-text SQL file).
-- **Python 3.10+** in the environment where you `pip install ou-runner`.
+- **Python 3.10+** available to `uv` (or `pip`) when installing.
 
 ---
 
@@ -78,6 +131,47 @@ When you're done, `ou-runner clean` sweeps every artifact `setup` and
 are not touched — run `docker compose down -v` if you want those gone
 too.
 
+> **Tip.** Every `ou-runner …` example below works just as well as
+> `uvx ou-runner …` if you'd rather not install the tool globally.
+
+---
+
+## What happens during a hop
+
+Every `ou-runner run --from X --to Y` runs these eight steps in order.
+Failures halt the hop and (outside `--hold-my-drink`) drop you into an
+interactive prompt so you can inspect, retry, or abort.
+
+```mermaid
+flowchart LR
+  A[Ensure Postgres up] --> B[Stop running Odoo containers]
+  B --> C[Restore source dump]
+  C --> D[Backup before migration]
+  D --> E[Start target version container]
+  E --> F[odoo -u all --stop-after-init]
+  F --> G[Restart container in normal mode]
+  G --> H[pg_dump -Fc to dumps/odoo_to_db.dump]
+```
+
+---
+
+## Chaining hops with `--hold-my-drink`
+
+OpenUpgrade only supports sequential hops, so going from v14 to v19
+means five upgrades. `--hold-my-drink` strings every intermediate hop
+together — each hop's dump becomes the next hop's input — and bypasses
+interactive prompts so a failure halts the chain cleanly.
+
+```mermaid
+flowchart LR
+  D14[(dumps/odoo_14_db.dump)] --> H1[hop 14→15]
+  H1 --> D15[(dumps/odoo_15_db.dump)] --> H2[hop 15→16]
+  H2 --> D16[(dumps/odoo_16_db.dump)] --> H3[hop 16→17]
+  H3 --> D17[(dumps/odoo_17_db.dump)] --> H4[hop 17→18]
+  H4 --> D18[(dumps/odoo_18_db.dump)] --> H5[hop 18→19]
+  H5 --> D19[(dumps/odoo_19_db.dump)]
+```
+
 ---
 
 ## Commands
@@ -107,8 +201,24 @@ listings.
 | 17 | 18 | 8018 | `dumps/odoo_18_db.dump` |
 | 18 | 19 | 8019 | `dumps/odoo_19_db.dump` |
 
-Skipping versions is not supported — OpenUpgrade requires sequential
-hops.
+---
+
+## How it works
+
+`ou-runner` is a thin orchestrator — it never touches a database
+directly. Under the hood it:
+
+- Clones the [OCA/OpenUpgrade][openupgrade] branches you need into
+  `openupgrade_<version>/` folders in your CWD.
+- Renders per-version `Dockerfile.openupgrade<N>` files and a single
+  `docker-compose.yml` that ties them together.
+- Drives `pg_dump`, `pg_restore`, and
+  `odoo -u all --stop-after-init --upgrade-path=…` through
+  `docker exec`, container by container.
+- Records every hop's wall-clock time in `migration_times.json`.
+
+Everything lives in the directory you ran it from. No global state,
+nothing in your home folder.
 
 ---
 
