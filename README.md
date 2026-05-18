@@ -55,7 +55,7 @@ flowchart LR
   subgraph WITH["🚀 With ou-runner"]
     direction TB
     R1[ou-runner setup --from 14 --to 19]
-    R1 --> R2[ou-runner run --from 14 --to 19 --hold-my-drink]
+    R1 --> R2[ou-runner migrate --from 14 --to 19 --hold-my-drink]
     R2 --> R3[ou-runner status]
   end
 ```
@@ -114,20 +114,20 @@ ou-runner setup --from 14 --to 19
 cp /path/to/your_v14_backup.dump dumps/odoo_14_db.dump
 
 # 3. Migrate one hop at a time, testing between each.
-ou-runner run --from 14 --to 15
+ou-runner migrate --from 14 --to 15
 # open http://localhost:8015, log in, smoke-test
-ou-runner run --from 15 --to 16
+ou-runner migrate --from 15 --to 16
 # …
 
 # Or, if you trust the chain end-to-end:
-ou-runner run --from 14 --to 19 --hold-my-drink
+ou-runner migrate --from 14 --to 19 --hold-my-drink
 
 # At any point:
 ou-runner status      # progress chain, dumps, backups, migration times
 ```
 
 When you're done, `ou-runner clean` sweeps every artifact `setup` and
-`run` produced in the current directory. Docker containers and volumes
+`migrate` produced in the current directory. Docker containers and volumes
 are not touched — run `docker compose down -v` if you want those gone
 too.
 
@@ -138,7 +138,7 @@ too.
 
 ## What happens during a hop
 
-Every `ou-runner run --from X --to Y` runs these eight steps in order.
+Every `ou-runner migrate --from X --to Y` runs these eight steps in order.
 Failures halt the hop and (outside `--hold-my-drink`) drop you into an
 interactive prompt so you can inspect, retry, or abort.
 
@@ -180,11 +180,11 @@ flowchart LR
 | --- | --- |
 | `setup --from <v> --to <v>` | Bootstrap the sandbox: clone OpenUpgrade branches, render Dockerfiles + `docker-compose.yml`. |
 | `update` | `git pull` every `openupgrade_<v>/` clone to the latest commits on its branch. |
-| `run --from <v> --to <v>` | Run one migration hop. Add `--hold-my-drink` to chain all hops up to `--to`. |
+| `migrate --from <v> --to <v>` | Run one migration hop. Add `--hold-my-drink` to chain all hops up to `--to`. |
 | `start <v>` | Boot a fresh, empty Odoo instance of one version (useful when you want to create a starter dump). |
 | `status` | Show the migration's state: progress chain, recorded times, dumps on disk, backups grouped by version. |
 | `logs <v> [-f]` | Tail the matching Odoo container's logs. |
-| `clean [-y]` | Sweep every artifact `setup`/`run` produced in the current directory. |
+| `clean [-y]` | Sweep every artifact `setup`/`migrate` produced in the current directory. |
 
 Run `ou-runner --help` (or `ou-runner <command> --help`) for full flag
 listings.

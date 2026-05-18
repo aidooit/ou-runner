@@ -577,7 +577,7 @@ def _run_single_migration(
         f"Output dump: [green]{version_to_filename(to_version)}[/green]\n\n"
         f"[bold]This Migration:[/bold] {format_duration(duration_seconds)}\n\n"
         f"[dim]Please test your instance before proceeding to the next version.[/dim]\n"
-        f"[dim]When ready, run: ou-runner run --from {to_version} --to {next_hint}[/dim]\n\n"
+        f"[dim]When ready, run: ou-runner migrate --from {to_version} --to {next_hint}[/dim]\n\n"
         f"[dim]Run 'ou-runner logs -f {to_version}' to view logs[/dim]\n",
         title="✓ Success",
         border_style="green"
@@ -745,7 +745,7 @@ def setup(
     """
     Roll out the welcome mat: clone the OpenUpgrade branches you need,
     render their Dockerfiles, and stitch together a docker-compose.yml so
-    `run` has everything it needs. No dump required yet — that comes later.
+    `migrate` has everything it needs. No dump required yet — that comes later.
 
     Examples:
         ou-runner setup --from 14 --to 19
@@ -865,9 +865,9 @@ def setup(
         f"Three small things stand between you and a migration:\n"
         f"  1. Drop your source dump at [yellow]dumps/{version_to_filename(from_version)}[/yellow]\n"
         f"  2. Take the safe path, one hop at a time: "
-        f"[cyan]ou-runner run --from {from_version} --to {version_list[from_idx + 1]}[/cyan]\n"
+        f"[cyan]ou-runner migrate --from {from_version} --to {version_list[from_idx + 1]}[/cyan]\n"
         f"  3. Or go all-in (and brave): "
-        f"[cyan]ou-runner run --from {from_version} --to {to_version} --hold-my-drink[/cyan]",
+        f"[cyan]ou-runner migrate --from {from_version} --to {to_version} --hold-my-drink[/cyan]",
         title="✓ Ready when you are",
         border_style="green",
     ))
@@ -1022,7 +1022,7 @@ def clean(
     ),
 ):
     """
-    Sweep the sandbox: undo everything `setup` (and `run`) put on disk —
+    Sweep the sandbox: undo everything `setup` (and `migrate`) put on disk —
     openupgrade_*/ clones, Dockerfile.openupgrade*, docker-compose.yml,
     dumps/, backups/, addons/ (including every custom_addons_<major>/),
     logs/, migration_times.json.
@@ -1129,7 +1129,7 @@ def clean(
 
 
 @app.command()
-def run(
+def migrate(
     from_version: int = typer.Option(..., "--from", help="Source version (e.g., 14)"),
     to_version: int = typer.Option(..., "--to", help="Target version (e.g., 15)"),
     skip_backup: bool = typer.Option(False, "--skip-backup", help="Skip creating backup before migration"),
@@ -1140,8 +1140,8 @@ def run(
     Migrate Odoo database from one version to another using OpenUpgrade.
 
     Example:
-        ou-runner run --from 14 --to 15
-        ou-runner run --from 14 --to 19 --hold-my-drink
+        ou-runner migrate --from 14 --to 15
+        ou-runner migrate --from 14 --to 19 --hold-my-drink
     """
 
     if from_version not in VERSIONS:
@@ -1168,8 +1168,8 @@ def run(
             console.print(f"[red]Error: Can only migrate to the next version sequentially[/red]")
             console.print(f"To migrate from {from_version} to {to_version}, run:")
             for i in range(from_idx, to_idx):
-                console.print(f"  ou-runner run --from {version_list[i]} --to {version_list[i+1]}")
-            console.print(f"\n[dim]Or run them all at once with: ou-runner run --from {from_version} --to {to_version} --hold-my-drink[/dim]")
+                console.print(f"  ou-runner migrate --from {version_list[i]} --to {version_list[i+1]}")
+            console.print(f"\n[dim]Or run them all at once with: ou-runner migrate --from {from_version} --to {to_version} --hold-my-drink[/dim]")
             sys.exit(1)
 
     if i_am_brave:
@@ -1209,7 +1209,7 @@ def run(
                         f"migrating from [bold]{src}[/bold] → [bold]{dst}[/bold].[/yellow]\n"
                         f"[yellow]I recommend you try from this version step by step. "
                         f"Divide and conquer.[/yellow]\n\n"
-                        f"[dim]Resume with: ou-runner run --from {src} --to {dst}[/dim]",
+                        f"[dim]Resume with: ou-runner migrate --from {src} --to {dst}[/dim]",
                         title="⚠ Brave Mode Halted",
                         border_style="yellow"
                     ))
@@ -1312,7 +1312,7 @@ def status():
         next_v = version_list[version_list.index(current) + 1]
         console.print(
             f"[bold]Current:[/bold] v{current}   "
-            f"[bold]Next:[/bold] [cyan]ou-runner run --from {current} --to {next_v}[/cyan]"
+            f"[bold]Next:[/bold] [cyan]ou-runner migrate --from {current} --to {next_v}[/cyan]"
         )
 
     # ── 2. Migration times ──────────────────────────────────────────────
