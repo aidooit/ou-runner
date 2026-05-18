@@ -54,7 +54,7 @@ flowchart LR
 
   subgraph WITH["🚀 With ou-runner"]
     direction TB
-    R1[ou-runner setup --from 14 --to 19]
+    R1[ou-runner setup]
     R1 --> R2[ou-runner migrate --from 14 --to 19 --hold-my-drink]
     R2 --> R3[ou-runner status]
   end
@@ -75,7 +75,7 @@ environment, runs the command, and gets out of the way:
 
 ```bash
 uvx ou-runner --help
-uvx ou-runner setup --from 14 --to 19
+uvx ou-runner setup
 ```
 
 Or with pip:
@@ -107,8 +107,9 @@ folder per migration:
 ```bash
 mkdir my-odoo-migration && cd my-odoo-migration
 
-# 1. Bootstrap the sandbox for the version range you need.
-ou-runner setup --from 14 --to 19
+# 1. Bootstrap the sandbox. setup is interactive — it will ask you
+#    for the source and target Odoo versions.
+ou-runner setup
 
 # 2. Drop your v14 dump where ou-runner expects it.
 cp /path/to/your_v14_backup.dump dumps/odoo_14_db.dump
@@ -178,7 +179,7 @@ flowchart LR
 
 | Command | What it does |
 | --- | --- |
-| `setup --from <v> --to <v>` | Bootstrap the sandbox: clone OpenUpgrade branches, render Dockerfiles + `docker-compose.yml`. |
+| `setup` | Bootstrap the sandbox interactively (asks for source/target versions): clone OpenUpgrade branches, render Dockerfiles + `docker-compose.yml`. |
 | `update` | `git pull` every `openupgrade_<v>/` clone to the latest commits on its branch. |
 | `migrate --from <v> --to <v>` | Run one migration hop. Add `--hold-my-drink` to chain all hops up to `--to`. |
 | `start <v>` | Boot a fresh, empty Odoo instance of one version (useful when you want to create a starter dump). |

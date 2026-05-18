@@ -9,7 +9,7 @@ migration_times.json) are created in the user's current working
 directory, so the recommended workflow is:
 
     mkdir my-odoo-migration && cd my-odoo-migration
-    ou-runner setup --from 14 --to 19
+    ou-runner setup
 """
 
 import json
@@ -648,25 +648,18 @@ def _render_compose(majors: list[int]) -> str:
     return header + services + volumes_block + networks_block
 
 
-def _clone_openupgrade(major: int, force: bool) -> str:
+def _clone_openupgrade(major: int) -> str:
     """Clone (or skip) an OpenUpgrade branch into openupgrade_<major>/.
 
-    Returns one of: 'created', 'exists', 'recloned'.
+    Returns one of: 'created', 'exists'.
     """
     target = Path(f"openupgrade_{major}")
     branch = f"{major}.0"
 
-    if target.exists() and force:
-        console.print(f"[yellow]Removing existing {target}/ (--force)[/yellow]")
-        shutil.rmtree(target)
-
     if target.exists():
         if (target / ".git").exists():
             return "exists"
-        console.print(
-            f"[red]{target}/ exists but is not a git repo. "
-            f"Re-run with --force to overwrite.[/red]"
-        )
+        console.print(f"[red]{target}/ exists but is not a git repo.[/red]")
         sys.exit(1)
 
     console.print(f"[cyan]Cloning OpenUpgrade branch {branch} → {target}/[/cyan]")
@@ -676,7 +669,7 @@ def _clone_openupgrade(major: int, force: bool) -> str:
         OPENUPGRADE_REPO_URL,
         str(target),
     ])
-    return "recloned" if force else "created"
+    return "created"
 
 
 def _update_openupgrade(major: int) -> tuple[str, str]:
@@ -707,19 +700,19 @@ def _update_openupgrade(major: int) -> tuple[str, str]:
     return "updated", stdout.splitlines()[0] if stdout else ""
 
 
-def _write_dockerfile(major: int, force: bool) -> str:
+def _write_dockerfile(major: int) -> str:
     """Render and write Dockerfile.openupgrade<major>. Returns 'wrote' or 'exists'."""
     path = Path(f"Dockerfile.openupgrade{major}")
-    if path.exists() and not force:
+    if path.exists():
         return "exists"
     path.write_text(_render_dockerfile(major))
     return "wrote"
 
 
-def _write_compose(majors: list[int], force: bool) -> str:
+def _write_compose(majors: list[int]) -> str:
     """Render and write docker-compose.yml. Returns 'wrote' or 'exists'."""
     path = Path("docker-compose.yml")
-    if path.exists() and not force:
+    if path.exists():
         return "exists"
     path.write_text(_render_compose(majors))
     return "wrote"
@@ -730,60 +723,40 @@ def _write_compose(majors: list[int], force: bool) -> str:
 # ============================================
 
 @app.command()
-def setup(
-    from_version: Optional[int] = typer.Option(
-        None, "-f", "--from", help="Source version (e.g., 14)"
-    ),
-    to_version: Optional[int] = typer.Option(
-        None, "-t", "--to", help="Target version (e.g., 19)"
-    ),
-    force: bool = typer.Option(
-        False, "--force",
-        help="Re-clone OpenUpgrade folders and overwrite Dockerfiles/docker-compose.yml",
-    ),
-):
+def setup():
     """
     Roll out the welcome mat: clone the OpenUpgrade branches you need,
     render their Dockerfiles, and stitch together a docker-compose.yml so
     `migrate` has everything it needs. No dump required yet — that comes later.
 
+    `setup` is interactive — it will walk you through the version range
+    before writing anything to disk.
+
     Examples:
-        ou-runner setup --from 14 --to 19
-        ou-runner setup -f 14 -t 16
-        ou-runner setup            # interactive
+        ou-runner setup
     """
-    if from_version is None or to_version is None:
-        console.print()
-        console.print(Panel.fit(
-            "[bold cyan]Setup — what's about to happen[/bold cyan]\n\n"
-            "We're going to bootstrap a sandbox so you can migrate an Odoo database\n"
-            "across versions using OpenUpgrade. For each version between [yellow]from[/yellow]\n"
-            "and [yellow]to[/yellow] we'll:\n\n"
-            "  • Shallow-clone the matching [green]OpenUpgrade[/green] branch into\n"
-            "    [dim]openupgrade_<version>/[/dim]\n"
-            "  • Render a [green]Dockerfile.openupgrade<version>[/green]\n"
-            "  • Stitch together a [green]docker-compose.yml[/green] with one service\n"
-            "    per version (plus postgres + pgadmin)\n\n"
-            "[bold]That's why we need to know your source and target versions:[/bold]\n"
-            "  • [yellow]from[/yellow]: the Odoo version your existing dump was taken from\n"
-            "  • [yellow]to[/yellow]:   the Odoo version you ultimately want to land on\n\n"
-            "[dim]Supported versions: 14, 15, 16, 17, 18, 19[/dim]",
-            title="🛠  Quick overview",
-            border_style="cyan",
-        ))
-        console.print()
+    console.print()
+    console.print(Panel.fit(
+        "[bold cyan]Setup — what's about to happen[/bold cyan]\n\n"
+        "We're going to bootstrap a sandbox so you can migrate an Odoo database\n"
+        "across versions using OpenUpgrade. For each version between [yellow]from[/yellow]\n"
+        "and [yellow]to[/yellow] we'll:\n\n"
+        "  • Shallow-clone the matching [green]OpenUpgrade[/green] branch into\n"
+        "    [dim]openupgrade_<version>/[/dim]\n"
+        "  • Render a [green]Dockerfile.openupgrade<version>[/green]\n"
+        "  • Stitch together a [green]docker-compose.yml[/green] with one service\n"
+        "    per version (plus postgres + pgadmin)\n\n"
+        "[bold]That's why we need to know your source and target versions:[/bold]\n"
+        "  • [yellow]from[/yellow]: the Odoo version your existing dump was taken from\n"
+        "  • [yellow]to[/yellow]:   the Odoo version you ultimately want to land on\n\n"
+        "[dim]Supported versions: 14, 15, 16, 17, 18, 19[/dim]",
+        title="🛠  Quick overview",
+        border_style="cyan",
+    ))
+    console.print()
 
-    if from_version is None:
-        from_version = _prompt_version("From which Odoo version?", default=14)
-    if to_version is None:
-        to_version = _prompt_version("To which Odoo version?", default=19)
-
-    if from_version not in VERSIONS:
-        console.print(f"[red]Unsupported source version '{from_version}'[/red]")
-        sys.exit(1)
-    if to_version not in VERSIONS:
-        console.print(f"[red]Unsupported target version '{to_version}'[/red]")
-        sys.exit(1)
+    from_version = _prompt_version("From which Odoo version?", default=14)
+    to_version = _prompt_version("To which Odoo version?", default=19)
 
     version_list = list(VERSIONS.keys())
     from_idx = version_list.index(from_version)
@@ -827,13 +800,13 @@ def setup(
     for major in target_majors:
         console.print()
         console.print(f"[bold cyan]── Version {major} ──[/bold cyan]")
-        clone_status = _clone_openupgrade(major, force)
+        clone_status = _clone_openupgrade(major)
         if clone_status == "exists":
             console.print(f"[dim]✓ openupgrade_{major}/ already present[/dim]")
         else:
             console.print(f"[green]✓ Cloned openupgrade_{major}/[/green]")
 
-        dockerfile_status = _write_dockerfile(major, force)
+        dockerfile_status = _write_dockerfile(major)
         if dockerfile_status == "wrote":
             console.print(f"[green]✓ Wrote Dockerfile.openupgrade{major}[/green]")
         else:
@@ -841,7 +814,7 @@ def setup(
 
         summary_rows.append((major, clone_status, dockerfile_status))
 
-    compose_status = _write_compose(target_majors, force)
+    compose_status = _write_compose(target_majors)
     console.print()
     if compose_status == "wrote":
         console.print(f"[green]✓ Wrote docker-compose.yml[/green]")
