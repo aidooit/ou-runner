@@ -45,7 +45,6 @@ DB_PASSWORD = "odoo"
 POSTGRES_CONTAINER = "odoo_postgres"
 DUMPS_DIR = Path("dumps")
 BACKUPS_DIR = Path("backups")
-ADDONS_DIR = Path("addons")
 LOGS_DIR = Path("logs")
 MIGRATION_TIMES_FILE = Path("migration_times.json")
 OPENUPGRADE_REPO_URL = "https://github.com/OCA/OpenUpgrade.git"
@@ -232,32 +231,8 @@ def check_docker():
 
 def ensure_directories():
     """Create the working directories the migration workflow expects."""
-    for d in (DUMPS_DIR, BACKUPS_DIR, ADDONS_DIR, LOGS_DIR):
+    for d in (DUMPS_DIR, BACKUPS_DIR, LOGS_DIR):
         d.mkdir(exist_ok=True)
-
-
-def custom_addons_dir(major: int) -> Path:
-    """Host-side custom-addons folder mounted into openupgrade<major>."""
-    return ADDONS_DIR / f"custom_addons_{major}"
-
-
-def ensure_custom_addons_dirs(majors: list[int]) -> list[tuple[int, str]]:
-    """Create addons/custom_addons_<major>/ for each major, with a .gitkeep.
-
-    Idempotent — never wipes user content. Returns a list of
-    (major, 'created' | 'exists') so callers can render a summary.
-    """
-    ADDONS_DIR.mkdir(exist_ok=True)
-    results: list[tuple[int, str]] = []
-    for major in majors:
-        target = custom_addons_dir(major)
-        status = "exists" if target.exists() else "created"
-        target.mkdir(exist_ok=True)
-        keep = target / ".gitkeep"
-        if not keep.exists():
-            keep.touch()
-        results.append((major, status))
-    return results
 
 
 def ensure_postgres_running():
@@ -445,7 +420,7 @@ def run_migration(to_version: int):
              "--stop-after-init",
              "--load=base,web,openupgrade_framework",
              "--upgrade-path=/mnt/openupgrade/openupgrade_scripts/scripts",
-             "--addons-path=/mnt/openupgrade,/mnt/custom_addons,/usr/lib/python3/dist-packages/odoo/addons",
+             "--addons-path=/mnt/openupgrade,/usr/lib/python3/dist-packages/odoo/addons",
              "--db_host=postgres",
              "--db_user=odoo",
              "--db_password=odoo"],
@@ -787,14 +762,7 @@ def setup():
     ))
 
     ensure_directories()
-    console.print(f"[green]✓ Working dirs ready: dumps/, backups/, addons/, logs/[/green]")
-
-    addons_results = ensure_custom_addons_dirs(target_majors)
-    for major, status in addons_results:
-        if status == "created":
-            console.print(f"[green]✓ Created addons/custom_addons_{major}/[/green]")
-        else:
-            console.print(f"[dim]✓ addons/custom_addons_{major}/ already present[/dim]")
+    console.print(f"[green]✓ Working dirs ready: dumps/, backups/, logs/[/green]")
 
     summary_rows = []
     for major in target_majors:
@@ -972,16 +940,8 @@ def _clean_targets() -> list[tuple[Path, str]]:
         if p.is_file():
             targets.append((p, "file"))
 
-    # Per-version custom addons folders — listed individually so users
-    # see them in the clean preview, then the parent addons/ sweeps any
-    # stragglers (and the .gitkeep files).
-    if ADDONS_DIR.is_dir():
-        for p in sorted(ADDONS_DIR.glob("custom_addons_*")):
-            if p.is_dir():
-                targets.append((p, "dir"))
-
     # Fixed dirs
-    for d in (DUMPS_DIR, BACKUPS_DIR, ADDONS_DIR, LOGS_DIR):
+    for d in (DUMPS_DIR, BACKUPS_DIR, LOGS_DIR):
         if d.is_dir():
             targets.append((d, "dir"))
 
@@ -997,8 +957,7 @@ def clean(
     """
     Sweep the sandbox: undo everything `setup` (and `migrate`) put on disk —
     openupgrade_*/ clones, Dockerfile.openupgrade*, docker-compose.yml,
-    dumps/, backups/, addons/ (including every custom_addons_<major>/),
-    logs/, migration_times.json.
+    dumps/, backups/, logs/, migration_times.json.
 
     Note: only artifacts in the current working directory are touched.
     Docker containers and volumes are NOT — run `docker compose down -v`

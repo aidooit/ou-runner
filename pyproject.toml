@@ -1,6 +1,6 @@
 [project]
 name = "ou-runner"
-version = "0.1.1"
+version = "0.1.2"
 description = "A Typer CLI that walks Odoo databases through OpenUpgrade version chains in Docker."
 readme = "README.md"
 requires-python = ">=3.10"
