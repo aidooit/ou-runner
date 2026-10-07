@@ -2,8 +2,21 @@ FROM {{BASE_IMAGE}}
 
 USER root
 
+# Older Debian-based Odoo images (e.g. the bullseye base under odoo:15.0 and
+# odoo:16.0) fall out of deb.debian.org once their release is archived
+# upstream, breaking `apt-get update`/`install` with 404s on security
+# packages. Repoint at archive.debian.org when that's the case; this is a
+# no-op (no matching lines) on images that aren't on an archived Debian
+# release, including non-Debian bases.
+RUN if [ -f /etc/apt/sources.list ]; then \
+      sed -i \
+        -e 's|deb.debian.org/debian-security|archive.debian.org/debian-security|g' \
+        -e 's|deb.debian.org/debian|archive.debian.org/debian|g' \
+        /etc/apt/sources.list; \
+    fi
+
 # Install git and openupgradelib
-RUN apt-get update && \
+RUN apt-get update -o Acquire::Check-Valid-Until=false && \
     apt-get install -y git && \
     pip3 install --no-cache-dir {{BREAK_SYS_PACKAGES}}git+https://github.com/OCA/openupgradelib.git@master git+https://github.com/odoo/upgrade-util@master#egg=odoo_upgrade && \
 {{EXTRA_PIP_LINE}}    apt-get clean && \
